@@ -1,7 +1,9 @@
-
 const int trigPin = 9;
 const int echoPin = 10;
 const int buzzerPin = 8;
+
+const int distanciaMax = 40; 
+const int distanciaMin = 5;   
 
 void setup() {
   pinMode(trigPin, OUTPUT);
@@ -27,9 +29,8 @@ void loop() {
   Serial.print("Distancia: ");
   Serial.print(distancia);
   Serial.println(" cm");
-
+ 
   if (distancia >= distanciaMax) {
-    // Muy lejos: alarma continua
     tone(buzzerPin, 1000);
     delay(100);
     noTone(buzzerPin);
