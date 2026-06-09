@@ -1,0 +1,49 @@
+
+const int trigPin = 9;
+const int echoPin = 10;
+const int buzzerPin = 8;
+
+void setup() {
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  pinMode(buzzerPin, OUTPUT);
+  Serial.begin(9600);
+}
+
+long medirDistancia() {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  long duracion = pulseIn(echoPin, HIGH);
+  long distancia = duracion * 0.034 / 2;
+  return distancia;
+}
+
+void loop() {
+  long distancia = medirDistancia();
+  Serial.print("Distancia: ");
+  Serial.print(distancia);
+  Serial.println(" cm");
+
+  if (distancia >= distanciaMax) {
+    // Muy lejos: alarma continua
+    tone(buzzerPin, 1000);
+    delay(100);
+    noTone(buzzerPin);
+    delay(100);
+
+  } else if (distancia <= distanciaMin) {
+    noTone(buzzerPin);
+    delay(200);
+
+  } else {
+    int intervalo = map(distancia, distanciaMin, distanciaMax, 800, 100);
+    tone(buzzerPin, 1000);
+    delay(100);
+    noTone(buzzerPin);
+    delay(intervalo);
+  }
+}
