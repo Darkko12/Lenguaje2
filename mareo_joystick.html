@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>La huella del mareo — Lo que armemos</title>
+<style>
+  body {
+    margin: 0;
+    background: #111;
+    color: #eee;
+    font-family: sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px;
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  p.sub {
+    color: #999;
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 14px;
+  }
+  #connectBtn {
+    background: #7f77dd;
+    color: #111;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 15px;
+    cursor: pointer;
+    margin-bottom: 20px;
+  }
+  #connectBtn:hover { background: #a29aef; }
+  #status {
+    font-size: 13px;
+    color: #999;
+    margin-bottom: 16px;
+  }
+  #stage {
+    position: relative;
+    width: 400px;
+    height: 400px;
+    border: 1px solid #333;
+    border-radius: 50%;
+    background: radial-gradient(circle, #1a1a1a 0%, #0a0a0a 100%);
+  }
+  #centerDot {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    background: #eee;
+    border-radius: 50%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+  .butterfly {
+    position: absolute;
+    font-size: 32px;
+    top: 50%;
+    left: 50%;
+    transform-origin: 0 0;
+  }
+  #readout {
+    margin-top: 20px;
+    font-size: 13px;
+    color: #999;
+    text-align: center;
+  }
+  #mareoBar {
+    width: 300px;
+    height: 10px;
+    background: #222;
+    border-radius: 5px;
+    margin-top: 10px;
+    overflow: hidden;
+  }
+  #mareoFill {
+    height: 100%;
+    width: 0%;
+    background: #d4537e;
+    transition: width 0.1s linear;
+  }
+</style>
+</head>
+<body>
+
+<h1>La huella del mareo</h1>
+<p class="sub">Girá el joystick para hacer girar las mariposas — cuanto más lo inclinás, más rápido giran</p>
+
+<button id="connectBtn">Conectar Arduino</button>
+<div id="status">Sin conectar</div>
+
+<div id="stage">
+  <div id="centerDot"></div>
+  <div class="butterfly" id="b1">🦋</div>
+  <div class="butterfly" id="b2">🦋</div>
+  <div class="butterfly" id="b3">🦋</div>
+</div>
+
+<div id="readout">
+  X: <span id="valX">-</span> &nbsp; Y: <span id="valY">-</span>
+  <div id="mareoBar"><div id="mareoFill"></div></div>
+</div>
+
+<script>
+let port, reader, keepReading = true;
+let angle = 0;
+let speed = 0; // velocidad de giro actual (rad por frame)
+const radius = 130;
+const butterflies = [document.getElementById('b1'), document.getElementById('b2'), document.getElementById('b3')];
+const CENTER = 512; // valor de reposo del joystick (0-1023)
+
+document.getElementById('connectBtn').addEventListener('click', connectSerial);
+
+async function connectSerial() {
+  if (!('serial' in navigator)) {
+    document.getElementById('status').textContent = 'Este navegador no soporta Web Serial. Usá Chrome o Edge.';
+    return;
+  }
+  try {
+    port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 9600 });
+    document.getElementById('status').textContent = 'Conectado';
+    document.getElementById('connectBtn').style.display = 'none';
+    readLoop();
+  } catch (err) {
+    document.getElementById('status').textContent = 'Error al conectar: ' + err.message;
+  }
+}
+
+async function readLoop() {
+  const textDecoder = new TextDecoderStream();
+  const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+  reader = textDecoder.readable.getReader();
+  let buffer = '';
+
+  while (keepReading) {
+    try {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += value;
+      let lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        parseLine(line.trim());
+      }
+    } catch (err) {
+      console.error(err);
+      break;
+    }
+  }
+}
+
+function parseLine(line) {
+  const parts = line.split(',');
+  if (parts.length < 2) return;
+  const x = parseInt(parts[0]);
+  const y = parseInt(parts[1]);
+  if (isNaN(x) || isNaN(y)) return;
+
+  document.getElementById('valX').textContent = x;
+  document.getElementById('valY').textContent = y;
+
+  // distancia del centro (0 = quieto, ~512 = maximo)
+  const dx = x - CENTER;
+  const dy = y - CENTER;
+  const magnitude = Math.sqrt(dx * dx + dy * dy);
+  const normalized = Math.min(magnitude / 512, 1); // 0 a 1
+
+  // velocidad proporcional al desplazamiento del joystick
+  speed = normalized * 0.15;
+
+  const pct = Math.round(normalized * 100);
+  document.getElementById('mareoFill').style.width = pct + '%';
+}
+
+function animate() {
+  angle += speed;
+  butterflies.forEach((b, i) => {
+    const offset = (i * 2 * Math.PI) / 3; // 120 grados entre cada una
+    const a = angle + offset;
+    const x = Math.cos(a) * radius;
+    const y = Math.sin(a) * radius;
+    b.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
+  });
+  requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+
+</body>
+</html>
